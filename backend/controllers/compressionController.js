@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { compress, decompress } = require('../utils/huffman');
+const { extractTextFromPDF, createPDFFromText } = require('../utils/pdfUtils');
 
 // Compress file endpoint
 const compressFile = async (req, res) => {
@@ -10,7 +11,23 @@ const compressFile = async (req, res) => {
     }
 
     const filePath = req.file.path;
-    const fileData = fs.readFileSync(filePath, 'utf8');
+    const fileExtension = path.extname(req.file.originalname).toLowerCase();
+    let fileData;
+    let isPDF = false;
+
+    // Handle PDF files
+    if (fileExtension === '.pdf') {
+      isPDF = true;
+      const pdfBuffer = fs.readFileSync(filePath);
+      fileData = await extractTextFromPDF(pdfBuffer);
+    } else {
+      // Handle text files
+      fileData = fs.readFileSync(filePath, 'utf8');
+    }
+
+    if (!fileData || fileData.trim().length === 0) {
+      return res.status(400).json({ error: 'File is empty or contains no extractable text' });
+    }
 
     // Perform compression
     const { compressedData, codes, originalLength, encodedLength } = compress(fileData);
@@ -27,7 +44,9 @@ const compressFile = async (req, res) => {
       codes,
       originalLength,
       encodedLength,
-      originalFileName: req.file.originalname
+      originalFileName: req.file.originalname,
+      isPDF: isPDF,
+      fileExtension: fileExtension
     }));
 
     // Calculate compression stats
@@ -42,6 +61,7 @@ const compressFile = async (req, res) => {
     res.json({
       success: true,
       message: 'File compressed successfully',
+      fileType: isPDF ? 'PDF' : 'Text',
       stats: {
         originalSize,
         compressedSize,
@@ -80,15 +100,27 @@ const decompressFile = async (req, res) => {
 
     // Read codes and metadata
     const metadata = JSON.parse(fs.readFileSync(codesFilePath, 'utf8'));
-    const { codes, originalLength } = metadata;
+    const { codes, originalLength, isPDF, fileExtension, originalFileName } = metadata;
 
     // Perform decompression
     const decompressedData = decompress(compressedData, codes, originalLength);
 
-    // Save decompressed file
-    const decompressedFileName = `decompressed_${Date.now()}.txt`;
-    const decompressedFilePath = path.join(__dirname, '../uploads', decompressedFileName);
-    fs.writeFileSync(decompressedFilePath, decompressedData);
+    let decompressedFileName;
+    let decompressedFilePath;
+
+    // Handle PDF files
+    if (isPDF) {
+      decompressedFileName = `decompressed_${Date.now()}.pdf`;
+      decompressedFilePath = path.join(__dirname, '../uploads', decompressedFileName);
+      
+      // Create PDF from decompressed text
+      await createPDFFromText(decompressedData, decompressedFilePath);
+    } else {
+      // Handle text files
+      decompressedFileName = `decompressed_${Date.now()}.txt`;
+      decompressedFilePath = path.join(__dirname, '../uploads', decompressedFileName);
+      fs.writeFileSync(decompressedFilePath, decompressedData);
+    }
 
     // Delete uploaded files
     fs.unlinkSync(compressedFilePath);
@@ -97,8 +129,9 @@ const decompressFile = async (req, res) => {
     res.json({
       success: true,
       message: 'File decompressed successfully',
+      fileType: isPDF ? 'PDF' : 'Text',
       file: decompressedFileName,
-      originalFileName: metadata.originalFileName || 'unknown'
+      originalFileName: originalFileName || 'unknown'
     });
 
   } catch (error) {
