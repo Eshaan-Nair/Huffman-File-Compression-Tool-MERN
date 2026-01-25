@@ -16,9 +16,9 @@ const Compress = () => {
       return 'No file selected';
     }
 
-    const allowedTypes = ['text/plain', 'application/pdf'];
-    if (!allowedTypes.includes(selectedFile.type)) {
-      return 'Only .txt and .pdf files are allowed';
+    // Only allow PDF files
+    if (selectedFile.type !== 'application/pdf') {
+      return 'Only PDF files are allowed';
     }
 
     if (selectedFile.size > MAX_FILE_SIZE) {
@@ -70,7 +70,7 @@ const Compress = () => {
 
   const handleCompress = async () => {
     if (!file) {
-      setError('Please select a file first');
+      setError('Please select a PDF file first');
       return;
     }
 
@@ -93,7 +93,7 @@ const Compress = () => {
       setResult(response.data);
       setLoading(false);
     } catch (err) {
-      setError(err.response?.data?.message || 'Compression failed');
+      setError(err.response?.data?.message || err.response?.data?.error || 'Compression failed');
       setLoading(false);
     }
   };
@@ -117,17 +117,16 @@ const Compress = () => {
   };
 
   const formatBytes = (bytes) => {
-    return (bytes / 1024).toFixed(2) + ' KB';
-  };
-
-  const getFileIcon = () => {
-    if (!file) return '📄';
-    return file.type === 'application/pdf' ? '📕' : '📄';
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   return (
     <div className="compress-container">
-      <h1 className="page-title">Compress File</h1>
+      <h1 className="page-title">Compress PDF</h1>
       
       <div className="upload-section">
         <div 
@@ -141,39 +140,35 @@ const Compress = () => {
             type="file"
             id="file-input"
             onChange={handleFileChange}
-            accept=".txt,.pdf"
+            accept=".pdf,application/pdf"
             className="file-input"
           />
           <label htmlFor="file-input" className="file-label">
-            <div className="upload-icon">📁</div>
+            <div className="upload-icon">📕</div>
             <p className="upload-text">
               {file ? (
                 <>
-                  <span className="file-icon">{getFileIcon()}</span>
+                  <span className="file-icon">✓</span>
                   <span className="file-name">{file.name}</span>
                 </>
               ) : (
                 <>
-                  <strong>Drop your file here</strong> or <span className="browse-link">browse</span>
+                  <strong>Drop your PDF here</strong> or <span className="browse-link">browse</span>
                 </>
               )}
             </p>
-            <p className="upload-hint">Supports: .txt and .pdf files (Max 25MB)</p>
+            <p className="upload-hint">Only PDF files (Max 25MB)</p>
           </label>
         </div>
 
         {file && (
           <div className="file-info">
             <div className="file-info-item">
-              <span className="info-label">File:</span>
+              <span className="info-label">📄 File:</span>
               <span className="info-value">{file.name}</span>
             </div>
             <div className="file-info-item">
-              <span className="info-label">Type:</span>
-              <span className="info-value">{file.type === 'application/pdf' ? 'PDF' : 'Text'}</span>
-            </div>
-            <div className="file-info-item">
-              <span className="info-label">Size:</span>
+              <span className="info-label">📊 Size:</span>
               <span className="info-value">{formatBytes(file.size)}</span>
             </div>
           </div>
@@ -187,10 +182,10 @@ const Compress = () => {
           {loading ? (
             <>
               <span className="spinner"></span>
-              Compressing...
+              Compressing PDF...
             </>
           ) : (
-            'Compress File'
+            '🗜️ Compress PDF'
           )}
         </button>
 
@@ -202,16 +197,16 @@ const Compress = () => {
           <h2>✅ Compression Complete!</h2>
           
           <div className="file-type-badge">
-            File Type: {result.fileType}
+            📦 ZIP Archive
           </div>
 
           <div className="stats">
             <div className="stat-item">
-              <span className="stat-label">Original Size:</span>
+              <span className="stat-label">Original PDF Size:</span>
               <span className="stat-value">{formatBytes(result.stats.originalSize)}</span>
             </div>
             <div className="stat-item">
-              <span className="stat-label">Compressed Size:</span>
+              <span className="stat-label">Compressed ZIP Size:</span>
               <span className="stat-value">{formatBytes(result.stats.compressedSize)}</span>
             </div>
             <div className="stat-item">
@@ -224,23 +219,15 @@ const Compress = () => {
             </div>
           </div>
 
-          <div className="download-buttons">
-            <button
-              onClick={() => handleDownload(result.files.compressedFile)}
-              className="download-btn"
-            >
-              📥 Download Compressed File
-            </button>
-            <button
-              onClick={() => handleDownload(result.files.codesFile)}
-              className="download-btn secondary"
-            >
-              📋 Download Codes File
-            </button>
-          </div>
+          <button
+            onClick={() => handleDownload(result.file)}
+            className="download-btn"
+          >
+            📥 Download Compressed ZIP
+          </button>
 
-          <div className="warning-note">
-            <strong>⚠️ Important:</strong> Save both files! You'll need them for decompression.
+          <div className="info-note">
+            <strong>ℹ️ Note:</strong> The ZIP file contains everything needed for decompression. Just upload this single file when you want to decompress!
           </div>
         </div>
       )}

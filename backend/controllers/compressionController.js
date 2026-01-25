@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const archiver = require('archiver');
+const unzipper = require('unzipper');
 const { compress, decompress } = require('../utils/huffman');
 const { extractTextFromPDF, createPDFFromText } = require('../utils/pdfUtils');
 
@@ -12,67 +14,81 @@ const compressFile = async (req, res) => {
 
     const filePath = req.file.path;
     const fileExtension = path.extname(req.file.originalname).toLowerCase();
-    let fileData;
-    let isPDF = false;
 
-    // Handle PDF files
-    if (fileExtension === '.pdf') {
-      isPDF = true;
-      const pdfBuffer = fs.readFileSync(filePath);
-      fileData = await extractTextFromPDF(pdfBuffer);
-    } else {
-      // Handle text files
-      fileData = fs.readFileSync(filePath, 'utf8');
+    // Only accept PDF files
+    if (fileExtension !== '.pdf') {
+      fs.unlinkSync(filePath);
+      return res.status(400).json({ error: 'Only PDF files are allowed' });
     }
 
+    // Extract text from PDF
+    const pdfBuffer = fs.readFileSync(filePath);
+    const fileData = await extractTextFromPDF(pdfBuffer);
+
     if (!fileData || fileData.trim().length === 0) {
-      return res.status(400).json({ error: 'File is empty or contains no extractable text' });
+      fs.unlinkSync(filePath);
+      return res.status(400).json({ error: 'PDF is empty or contains no extractable text' });
     }
 
     // Perform compression
     const { compressedData, codes, originalLength, encodedLength } = compress(fileData);
 
-    // Save compressed file
-    const compressedFileName = `compressed_${Date.now()}.bin`;
-    const compressedFilePath = path.join(__dirname, '../uploads', compressedFileName);
-    fs.writeFileSync(compressedFilePath, compressedData);
+    // Create temporary files
+    const timestamp = Date.now();
+    const compressedFileName = `compressed_data.bin`;
+    const codesFileName = `codes.json`;
+    const zipFileName = `compressed_${timestamp}.zip`;
 
-    // Save codes file (metadata)
-    const codesFileName = `codes_${Date.now()}.json`;
+    const compressedFilePath = path.join(__dirname, '../uploads', compressedFileName);
     const codesFilePath = path.join(__dirname, '../uploads', codesFileName);
+    const zipFilePath = path.join(__dirname, '../uploads', zipFileName);
+
+    // Save compressed data and codes temporarily
+    fs.writeFileSync(compressedFilePath, compressedData);
     fs.writeFileSync(codesFilePath, JSON.stringify({
       codes,
       originalLength,
       encodedLength,
-      originalFileName: req.file.originalname,
-      isPDF: isPDF,
-      fileExtension: fileExtension
+      originalFileName: req.file.originalname
     }));
 
-    // Calculate compression stats
-    const originalSize = fs.statSync(filePath).size;
-    const compressedSize = fs.statSync(compressedFilePath).size;
-    const compressionRatio = ((compressedSize / originalSize) * 100).toFixed(2);
-    const spaceSaved = originalSize - compressedSize;
+    // Create ZIP file containing both compressed data and codes
+    const output = fs.createWriteStream(zipFilePath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
 
-    // Delete original uploaded file
-    fs.unlinkSync(filePath);
+    output.on('close', () => {
+      // Calculate compression stats
+      const originalSize = fs.statSync(filePath).size;
+      const compressedSize = fs.statSync(zipFilePath).size;
+      const compressionRatio = ((compressedSize / originalSize) * 100).toFixed(2);
+      const spaceSaved = originalSize - compressedSize;
 
-    res.json({
-      success: true,
-      message: 'File compressed successfully',
-      fileType: isPDF ? 'PDF' : 'Text',
-      stats: {
-        originalSize,
-        compressedSize,
-        compressionRatio: `${compressionRatio}%`,
-        spaceSaved
-      },
-      files: {
-        compressedFile: compressedFileName,
-        codesFile: codesFileName
-      }
+      // Clean up temporary files
+      fs.unlinkSync(filePath);
+      fs.unlinkSync(compressedFilePath);
+      fs.unlinkSync(codesFilePath);
+
+      res.json({
+        success: true,
+        message: 'PDF compressed successfully',
+        stats: {
+          originalSize,
+          compressedSize,
+          compressionRatio: `${compressionRatio}%`,
+          spaceSaved
+        },
+        file: zipFileName
+      });
     });
+
+    archive.on('error', (err) => {
+      throw err;
+    });
+
+    archive.pipe(output);
+    archive.file(compressedFilePath, { name: 'compressed_data.bin' });
+    archive.file(codesFilePath, { name: 'codes.json' });
+    archive.finalize();
 
   } catch (error) {
     console.error('Compression error:', error);
@@ -86,52 +102,68 @@ const compressFile = async (req, res) => {
 // Decompress file endpoint
 const decompressFile = async (req, res) => {
   try {
-    if (!req.files || !req.files.compressedFile || !req.files.codesFile) {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const zipFilePath = req.file.path;
+    const fileExtension = path.extname(req.file.originalname).toLowerCase();
+
+    // Only accept ZIP files
+    if (fileExtension !== '.zip') {
+      fs.unlinkSync(zipFilePath);
+      return res.status(400).json({ error: 'Only ZIP files are allowed for decompression' });
+    }
+
+    const timestamp = Date.now();
+    const extractDir = path.join(__dirname, '../uploads', `extract_${timestamp}`);
+    
+    // Create extraction directory
+    if (!fs.existsSync(extractDir)) {
+      fs.mkdirSync(extractDir);
+    }
+
+    // Extract ZIP file
+    await fs.createReadStream(zipFilePath)
+      .pipe(unzipper.Extract({ path: extractDir }))
+      .promise();
+
+    // Read extracted files
+    const compressedDataPath = path.join(extractDir, 'compressed_data.bin');
+    const codesPath = path.join(extractDir, 'codes.json');
+
+    if (!fs.existsSync(compressedDataPath) || !fs.existsSync(codesPath)) {
+      // Clean up
+      fs.unlinkSync(zipFilePath);
+      fs.rmSync(extractDir, { recursive: true, force: true });
       return res.status(400).json({ 
-        error: 'Both compressed file and codes file are required' 
+        error: 'Invalid compressed file. Missing required data.' 
       });
     }
 
-    const compressedFilePath = req.files.compressedFile[0].path;
-    const codesFilePath = req.files.codesFile[0].path;
-
-    // Read compressed data
-    const compressedData = fs.readFileSync(compressedFilePath);
-
-    // Read codes and metadata
-    const metadata = JSON.parse(fs.readFileSync(codesFilePath, 'utf8'));
-    const { codes, originalLength, isPDF, fileExtension, originalFileName } = metadata;
+    // Read compressed data and codes
+    const compressedData = fs.readFileSync(compressedDataPath);
+    const metadata = JSON.parse(fs.readFileSync(codesPath, 'utf8'));
+    const { codes, originalLength, originalFileName } = metadata;
 
     // Perform decompression
     const decompressedData = decompress(compressedData, codes, originalLength);
 
-    let decompressedFileName;
-    let decompressedFilePath;
+    // Create PDF from decompressed text
+    const decompressedFileName = `decompressed_${timestamp}.pdf`;
+    const decompressedFilePath = path.join(__dirname, '../uploads', decompressedFileName);
+    
+    await createPDFFromText(decompressedData, decompressedFilePath);
 
-    // Handle PDF files
-    if (isPDF) {
-      decompressedFileName = `decompressed_${Date.now()}.pdf`;
-      decompressedFilePath = path.join(__dirname, '../uploads', decompressedFileName);
-      
-      // Create PDF from decompressed text
-      await createPDFFromText(decompressedData, decompressedFilePath);
-    } else {
-      // Handle text files
-      decompressedFileName = `decompressed_${Date.now()}.txt`;
-      decompressedFilePath = path.join(__dirname, '../uploads', decompressedFileName);
-      fs.writeFileSync(decompressedFilePath, decompressedData);
-    }
-
-    // Delete uploaded files
-    fs.unlinkSync(compressedFilePath);
-    fs.unlinkSync(codesFilePath);
+    // Clean up temporary files
+    fs.unlinkSync(zipFilePath);
+    fs.rmSync(extractDir, { recursive: true, force: true });
 
     res.json({
       success: true,
-      message: 'File decompressed successfully',
-      fileType: isPDF ? 'PDF' : 'Text',
+      message: 'PDF decompressed successfully',
       file: decompressedFileName,
-      originalFileName: originalFileName || 'unknown'
+      originalFileName: originalFileName || 'unknown.pdf'
     });
 
   } catch (error) {

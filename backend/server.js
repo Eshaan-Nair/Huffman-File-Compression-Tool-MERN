@@ -31,17 +31,30 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
+// Multer configuration for compression (PDF only)
+const uploadCompress = multer({ 
   storage,
   limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['.txt', '.pdf'];
     const ext = path.extname(file.originalname).toLowerCase();
-    
-    if (allowedTypes.includes(ext)) {
+    if (ext === '.pdf') {
       cb(null, true);
     } else {
-      cb(new Error('Only .txt and .pdf files are allowed'));
+      cb(new Error('Only PDF files are allowed'));
+    }
+  }
+});
+
+// Multer configuration for decompression (ZIP only)
+const uploadDecompress = multer({ 
+  storage,
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext === '.zip') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only ZIP files are allowed for decompression'));
     }
   }
 });
@@ -60,13 +73,10 @@ app.get('/', (req, res) => {
 });
 
 // Compress endpoint
-app.post('/api/compress', upload.single('file'), compressFile);
+app.post('/api/compress', uploadCompress.single('file'), compressFile);
 
 // Decompress endpoint
-app.post('/api/decompress', upload.fields([
-  { name: 'compressedFile', maxCount: 1 },
-  { name: 'codesFile', maxCount: 1 }
-]), decompressFile);
+app.post('/api/decompress', uploadDecompress.single('file'), decompressFile);
 
 // Download endpoint
 app.get('/api/download/:filename', downloadFile);
