@@ -8,6 +8,7 @@ const Compress = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [dragActive, setDragActive] = useState(false);
+  const [filePreview, setFilePreview] = useState(null);
 
   const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 
@@ -16,7 +17,6 @@ const Compress = () => {
       return 'No file selected';
     }
 
-    // Only allow PDF files
     if (selectedFile.type !== 'application/pdf') {
       return 'Only PDF files are allowed';
     }
@@ -33,21 +33,30 @@ const Compress = () => {
     processFile(selectedFile);
   };
 
-  const processFile = (selectedFile) => {
+  const processFile = async (selectedFile) => {
     const validationError = validateFile(selectedFile);
     
     if (validationError) {
       setError(validationError);
       setFile(null);
+      setFilePreview(null);
       return;
     }
 
     setFile(selectedFile);
     setResult(null);
     setError(null);
+
+    // Create file preview
+    const preview = {
+      name: selectedFile.name,
+      size: selectedFile.size,
+      type: selectedFile.type,
+      lastModified: new Date(selectedFile.lastModified).toLocaleString()
+    };
+    setFilePreview(preview);
   };
 
-  // Drag and drop handlers
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -84,10 +93,6 @@ const Compress = () => {
       const response = await axios.post('/compress', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
-        },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          console.log(`Upload Progress: ${percentCompleted}%`);
         }
       });
       setResult(response.data);
@@ -114,7 +119,6 @@ const Compress = () => {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Download error:', err);
-      // Don't show error if download actually succeeded
     }
   };
 
@@ -126,9 +130,14 @@ const Compress = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const getCompressionPercentage = () => {
+    if (!result) return 0;
+    return 100 - parseFloat(result.stats.compressionRatio);
+  };
+
   return (
     <div className="compress-container">
-      <h1 className="page-title">Compress PDF</h1>
+      <h1 className="page-title">🗜️ Compress PDF</h1>
       
       <div className="upload-section">
         <div 
@@ -163,15 +172,26 @@ const Compress = () => {
           </label>
         </div>
 
-        {file && (
-          <div className="file-info">
-            <div className="file-info-item">
-              <span className="info-label">📄 File:</span>
-              <span className="info-value">{file.name}</span>
-            </div>
-            <div className="file-info-item">
-              <span className="info-label">📊 Size:</span>
-              <span className="info-value">{formatBytes(file.size)}</span>
+        {filePreview && (
+          <div className="file-preview">
+            <h3 className="preview-title">📄 File Preview</h3>
+            <div className="preview-grid">
+              <div className="preview-item">
+                <span className="preview-label">Filename:</span>
+                <span className="preview-value">{filePreview.name}</span>
+              </div>
+              <div className="preview-item">
+                <span className="preview-label">Size:</span>
+                <span className="preview-value">{formatBytes(filePreview.size)}</span>
+              </div>
+              <div className="preview-item">
+                <span className="preview-label">Type:</span>
+                <span className="preview-value">PDF Document</span>
+              </div>
+              <div className="preview-item">
+                <span className="preview-label">Modified:</span>
+                <span className="preview-value">{filePreview.lastModified}</span>
+              </div>
             </div>
           </div>
         )}
@@ -198,26 +218,57 @@ const Compress = () => {
         <div className="result-section">
           <h2>✅ Compression Complete!</h2>
           
-          <div className="file-type-badge">
-            📦 ZIP Archive
+          <div className="compression-visual">
+            <div className="size-comparison">
+              <div className="size-bar original-bar">
+                <div className="bar-label">Original Size</div>
+                <div className="bar-container">
+                  <div className="bar-fill original-fill" style={{width: '100%'}}>
+                    {formatBytes(result.stats.originalSize)}
+                  </div>
+                </div>
+              </div>
+              <div className="size-bar compressed-bar">
+                <div className="bar-label">Compressed Size</div>
+                <div className="bar-container">
+                  <div 
+                    className="bar-fill compressed-fill" 
+                    style={{width: result.stats.compressionRatio}}
+                  >
+                    {/* {formatBytes(result.stats.compressedSize)} */}{/*Removed compressed size in the bar fill due to text overlap issue*/}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="savings-badge">
+              <div className="savings-percentage">{getCompressionPercentage().toFixed(0)}%</div>
+              <div className="savings-label">Space Saved</div>
+              <div className="savings-amount">{formatBytes(result.stats.spaceSaved)}</div>
+            </div>
           </div>
 
-          <div className="stats">
-            <div className="stat-item">
-              <span className="stat-label">Original PDF Size:</span>
-              <span className="stat-value">{formatBytes(result.stats.originalSize)}</span>
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-icon">📊</div>
+              <div className="stat-info">
+                <div className="stat-label">Original</div>
+                <div className="stat-value">{formatBytes(result.stats.originalSize)}</div>
+              </div>
             </div>
-            <div className="stat-item">
-              <span className="stat-label">Compressed ZIP Size:</span>
-              <span className="stat-value">{formatBytes(result.stats.compressedSize)}</span>
+            <div className="stat-card">
+              <div className="stat-icon">📦</div>
+              <div className="stat-info">
+                <div className="stat-label">Compressed</div>
+                <div className="stat-value">{formatBytes(result.stats.compressedSize)}</div>
+              </div>
             </div>
-            <div className="stat-item">
-              <span className="stat-label">Compression Ratio:</span>
-              <span className="stat-value">{result.stats.compressionRatio}</span>
-            </div>
-            <div className="stat-item highlight">
-              <span className="stat-label">💾 Space Saved:</span>
-              <span className="stat-value">{formatBytes(result.stats.spaceSaved)}</span>
+            <div className="stat-card highlight">
+              <div className="stat-icon">💾</div>
+              <div className="stat-info">
+                <div className="stat-label">Saved</div>
+                <div className="stat-value">{formatBytes(result.stats.spaceSaved)}</div>
+              </div>
             </div>
           </div>
 

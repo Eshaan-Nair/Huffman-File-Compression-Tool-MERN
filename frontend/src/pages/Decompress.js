@@ -43,7 +43,6 @@ const Decompress = () => {
     setResult(null);
   };
 
-  // Drag handlers
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -105,7 +104,6 @@ const Decompress = () => {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Download error:', err);
-      // Don't show error if download actually succeeded
     }
   };
 
@@ -119,7 +117,7 @@ const Decompress = () => {
 
   return (
     <div className="decompress-container">
-      <h1 className="page-title">Decompress PDF</h1>
+      <h1 className="page-title">📂 Decompress PDF</h1>
       
       <div className="upload-section">
         <div className="file-upload-group">
@@ -186,17 +184,19 @@ const Decompress = () => {
         <div className="result-section">
           <h2>✅ Decompression Complete!</h2>
           
-          <div className="file-type-badge">
-            📕 PDF Document
+          <div className="success-animation">
+            <div className="checkmark-circle">
+              <div className="checkmark">✓</div>
+            </div>
           </div>
 
           <div className="success-info">
             <div className="info-row">
-              <span className="info-label">Original PDF Name:</span>
+              <span className="info-label">📄 Original PDF Name:</span>
               <span className="info-value">{result.originalFileName}</span>
             </div>
             <div className="info-row">
-              <span className="info-label">Decompressed File:</span>
+              <span className="info-label">📕 Decompressed File:</span>
               <span className="info-value">{result.file}</span>
             </div>
           </div>
@@ -207,6 +207,10 @@ const Decompress = () => {
           >
             📥 Download Decompressed PDF
           </button>
+
+          <div className="info-note">
+            <strong>✨ Success!</strong> Your PDF has been restored to its original form.
+          </div>
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 .decompress-container {
-  max-width: 800px;
+  max-width: 900px;
   margin: 40px auto;
   padding: 20px;
 }
@@ -9,10 +9,13 @@
 }
 
 .file-upload-group h3 {
-  color: #555;
-  margin-bottom: 15px;
-  font-size: 1.2rem;
+  color: #b8c1ec;
+  margin-bottom: 20px;
+  font-size: 1.3rem;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .file-drop-zone {
@@ -21,22 +24,40 @@
 }
 
 .file-drop-zone.drag-active .file-label {
-  border-color: #2196F3;
-  background: #e3f2fd;
+  border-color: #533483;
+  background: rgba(83, 52, 131, 0.1);
   transform: scale(1.02);
 }
 
 .upload-icon {
-  font-size: 2.5rem;
-  margin-bottom: 10px;
+  font-size: 3.5rem;
+  margin-bottom: 15px;
+  animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
 
 .files-info {
-  background: #f9f9f9;
+  background: rgba(15, 52, 96, 0.4);
   padding: 20px;
-  border-radius: 8px;
-  margin: 20px 0;
-  border-left: 4px solid #4CAF50;
+  border-radius: 12px;
+  margin: 25px 0;
+  border: 1px solid rgba(83, 52, 131, 0.3);
+  animation: slideIn 0.5s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .file-info-item {
@@ -44,7 +65,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 0;
-  color: #333;
+  color: #b8c1ec;
 }
 
 .file-info-item.warning {
@@ -55,14 +76,18 @@
   font-size: 1.2rem;
 }
 
+.file-info-item strong {
+  color: #ffffff;
+}
+
 .decompress-btn-action {
   width: 100%;
-  padding: 15px;
-  background: #2196F3;
+  padding: 18px;
+  background: linear-gradient(135deg, #533483 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 1.1rem;
+  border-radius: 10px;
+  font-size: 1.2rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -70,18 +95,20 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
+  box-shadow: 0 4px 15px rgba(83, 52, 131, 0.4);
 }
 
 .decompress-btn-action:hover:not(:disabled) {
-  background: #0b7dda;
+  background: linear-gradient(135deg, #764ba2 0%, #8e5bb5 100%);
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
+  box-shadow: 0 8px 25px rgba(83, 52, 131, 0.6);
 }
 
 .decompress-btn-action:disabled {
-  background: #ccc;
+  background: rgba(107, 114, 142, 0.3);
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
 }
 
 .spinner {
@@ -98,13 +125,13 @@
 }
 
 .result-section {
-  animation: slideIn 0.5s ease;
+  animation: fadeInUp 0.6s ease;
 }
 
-@keyframes slideIn {
+@keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(30px);
   }
   to {
     opacity: 1;
@@ -112,31 +139,65 @@
   }
 }
 
-.file-type-badge {
-  text-align: center;
-  background: #e3f2fd;
-  color: #1976d2;
-  padding: 8px 20px;
-  border-radius: 20px;
-  font-weight: 600;
-  margin: 0 auto 30px;
-  display: block;
-  width: fit-content;
+/* Success Animation */
+.success-animation {
+  display: flex;
+  justify-content: center;
+  margin: 30px 0;
+}
+
+.checkmark-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e94560 0%, #533483 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: scaleIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 8px 30px rgba(233, 69, 96, 0.4);
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.checkmark {
+  font-size: 4rem;
+  color: white;
+  animation: checkmarkPop 0.3s ease 0.6s both;
+}
+
+@keyframes checkmarkPop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
 }
 
 .success-info {
-  background: #f9f9f9;
+  background: rgba(15, 52, 96, 0.4);
   padding: 25px;
-  border-radius: 8px;
+  border-radius: 12px;
   margin-bottom: 25px;
+  border: 1px solid rgba(83, 52, 131, 0.3);
 }
 
 .info-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 15px 0;
+  border-bottom: 1px solid rgba(184, 193, 236, 0.1);
 }
 
 .info-row:last-child {
@@ -144,12 +205,12 @@
 }
 
 .info-label {
-  color: #666;
+  color: #7b8bb8;
   font-weight: 500;
 }
 
 .info-value {
-  color: #333;
+  color: #ffffff;
   font-weight: 600;
   text-align: right;
   max-width: 60%;
@@ -158,21 +219,32 @@
 
 .download-btn {
   width: 100%;
-  padding: 15px;
-  background: #4CAF50;
+  padding: 18px;
+  background: linear-gradient(135deg, #e94560 0%, #d63447 100%);
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 1.1rem;
+  border-radius: 10px;
+  font-size: 1.2rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+  margin-bottom: 20px;
 }
 
 .download-btn:hover {
-  background: #45a049;
+  background: linear-gradient(135deg, #d63447 0%, #c42d3d 100%);
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 8px 25px rgba(233, 69, 96, 0.6);
+}
+
+.info-note {
+  background: rgba(76, 175, 80, 0.1);
+  border-left: 4px solid #4CAF50;
+  padding: 15px;
+  border-radius: 8px;
+  color: #81c784;
+  text-align: center;
 }
 
 @media (max-width: 768px) {
@@ -187,5 +259,14 @@
   .info-value {
     max-width: 50%;
     font-size: 0.9rem;
+  }
+
+  .checkmark-circle {
+    width: 100px;
+    height: 100px;
+  }
+
+  .checkmark {
+    font-size: 3rem;
   }
 }

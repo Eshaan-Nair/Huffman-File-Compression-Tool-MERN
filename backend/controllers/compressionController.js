@@ -36,9 +36,6 @@ const compressFile = async (req, res) => {
 
     // Get original filename without extension
     const originalName = path.parse(req.file.originalname).name;
-    
-    console.log('Original file uploaded:', req.file.originalname);
-    console.log('Name for ZIP:', originalName);
 
     // Create single compressed file with embedded metadata
     // Format: [metadata_length (4 bytes)][metadata_json][compressed_data]
@@ -165,9 +162,6 @@ const decompressFile = async (req, res) => {
     const compressedData = combinedData.slice(4 + metadataLength);
 
     const { codes, originalLength, originalFileName } = metadata;
-
-    console.log('Metadata from ZIP:', metadata);
-    console.log('Original filename:', originalFileName);
 
     // Perform decompression
     const decompressedData = decompress(compressedData, codes, originalLength);
