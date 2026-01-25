@@ -23,7 +23,8 @@ const compressFile = async (req, res) => {
 
     // Extract text from PDF
     const pdfBuffer = fs.readFileSync(filePath);
-    const fileData = await extractTextFromPDF(pdfBuffer);
+    const extractedData = await extractTextFromPDF(pdfBuffer);
+    const fileData = typeof extractedData === 'string' ? extractedData : extractedData.text;
 
     if (!fileData || fileData.trim().length === 0) {
       fs.unlinkSync(filePath);
@@ -33,26 +34,38 @@ const compressFile = async (req, res) => {
     // Perform compression
     const { compressedData, codes, originalLength, encodedLength } = compress(fileData);
 
-    // Create temporary files
-    const timestamp = Date.now();
-    const compressedFileName = `compressed_data.bin`;
-    const codesFileName = `codes.json`;
-    const zipFileName = `compressed_${timestamp}.zip`;
+    // Get original filename without extension
+    const originalName = path.parse(req.file.originalname).name;
+    
+    console.log('Original file uploaded:', req.file.originalname);
+    console.log('Name for ZIP:', originalName);
 
-    const compressedFilePath = path.join(__dirname, '../uploads', compressedFileName);
-    const codesFilePath = path.join(__dirname, '../uploads', codesFileName);
-    const zipFilePath = path.join(__dirname, '../uploads', zipFileName);
-
-    // Save compressed data and codes temporarily
-    fs.writeFileSync(compressedFilePath, compressedData);
-    fs.writeFileSync(codesFilePath, JSON.stringify({
+    // Create single compressed file with embedded metadata
+    // Format: [metadata_length (4 bytes)][metadata_json][compressed_data]
+    const metadataObj = {
       codes,
       originalLength,
       encodedLength,
-      originalFileName: req.file.originalname
-    }));
+      originalFileName: req.file.originalname, // Full original filename with extension
+      timestamp: Date.now()
+    };
+    const metadataStr = JSON.stringify(metadataObj);
+    const metadataBuffer = Buffer.from(metadataStr, 'utf8');
+    const metadataLength = Buffer.alloc(4);
+    metadataLength.writeUInt32BE(metadataBuffer.length, 0);
 
-    // Create ZIP file containing both compressed data and codes
+    // Combine metadata and compressed data
+    const combinedData = Buffer.concat([metadataLength, metadataBuffer, compressedData]);
+
+    // Save combined file
+    const combinedFileName = `${originalName}_compressed.dat`;
+    const combinedFilePath = path.join(__dirname, '../uploads', combinedFileName);
+    fs.writeFileSync(combinedFilePath, combinedData);
+
+    // Create ZIP file with the same name as original PDF
+    const zipFileName = `${originalName}.zip`;
+    const zipFilePath = path.join(__dirname, '../uploads', zipFileName);
+
     const output = fs.createWriteStream(zipFilePath);
     const archive = archiver('zip', { zlib: { level: 9 } });
 
@@ -65,8 +78,7 @@ const compressFile = async (req, res) => {
 
       // Clean up temporary files
       fs.unlinkSync(filePath);
-      fs.unlinkSync(compressedFilePath);
-      fs.unlinkSync(codesFilePath);
+      fs.unlinkSync(combinedFilePath);
 
       res.json({
         success: true,
@@ -77,7 +89,8 @@ const compressFile = async (req, res) => {
           compressionRatio: `${compressionRatio}%`,
           spaceSaved
         },
-        file: zipFileName
+        file: zipFileName,
+        originalFileName: req.file.originalname
       });
     });
 
@@ -86,8 +99,7 @@ const compressFile = async (req, res) => {
     });
 
     archive.pipe(output);
-    archive.file(compressedFilePath, { name: 'compressed_data.bin' });
-    archive.file(codesFilePath, { name: 'codes.json' });
+    archive.file(combinedFilePath, { name: 'compressed.dat' });
     archive.finalize();
 
   } catch (error) {
@@ -128,12 +140,10 @@ const decompressFile = async (req, res) => {
       .pipe(unzipper.Extract({ path: extractDir }))
       .promise();
 
-    // Read extracted files
-    const compressedDataPath = path.join(extractDir, 'compressed_data.bin');
-    const codesPath = path.join(extractDir, 'codes.json');
+    // Read the combined compressed file
+    const combinedDataPath = path.join(extractDir, 'compressed.dat');
 
-    if (!fs.existsSync(compressedDataPath) || !fs.existsSync(codesPath)) {
-      // Clean up
+    if (!fs.existsSync(combinedDataPath)) {
       fs.unlinkSync(zipFilePath);
       fs.rmSync(extractDir, { recursive: true, force: true });
       return res.status(400).json({ 
@@ -141,18 +151,42 @@ const decompressFile = async (req, res) => {
       });
     }
 
-    // Read compressed data and codes
-    const compressedData = fs.readFileSync(compressedDataPath);
-    const metadata = JSON.parse(fs.readFileSync(codesPath, 'utf8'));
+    // Read combined file
+    const combinedData = fs.readFileSync(combinedDataPath);
+
+    // Extract metadata length (first 4 bytes)
+    const metadataLength = combinedData.readUInt32BE(0);
+
+    // Extract metadata
+    const metadataBuffer = combinedData.slice(4, 4 + metadataLength);
+    const metadata = JSON.parse(metadataBuffer.toString('utf8'));
+
+    // Extract compressed data
+    const compressedData = combinedData.slice(4 + metadataLength);
+
     const { codes, originalLength, originalFileName } = metadata;
+
+    console.log('Metadata from ZIP:', metadata);
+    console.log('Original filename:', originalFileName);
 
     // Perform decompression
     const decompressedData = decompress(compressedData, codes, originalLength);
 
-    // Create PDF from decompressed text
-    const decompressedFileName = `decompressed_${timestamp}.pdf`;
+    // Use original filename - ensure it has .pdf extension
+    let decompressedFileName;
+    if (originalFileName) {
+      // Keep exact original filename
+      decompressedFileName = originalFileName;
+      console.log('Using original filename:', decompressedFileName);
+    } else {
+      // Fallback if no original filename
+      decompressedFileName = `decompressed_${timestamp}.pdf`;
+      console.log('Using fallback filename:', decompressedFileName);
+    }
+
     const decompressedFilePath = path.join(__dirname, '../uploads', decompressedFileName);
     
+    // Create PDF from decompressed text
     await createPDFFromText(decompressedData, decompressedFilePath);
 
     // Clean up temporary files
@@ -186,21 +220,27 @@ const downloadFile = async (req, res) => {
     }
 
     res.download(filePath, filename, (err) => {
-      if (err) {
+      if (err && !res.headersSent) {
         console.error('Download error:', err);
-        res.status(500).json({ error: 'Download failed' });
+        return res.status(500).json({ error: 'Download failed' });
       }
       // Delete file after download
       setTimeout(() => {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        } catch (cleanupErr) {
+          console.error('Cleanup error:', cleanupErr);
         }
-      }, 1000);
+      }, 2000);
     });
 
   } catch (error) {
     console.error('Download error:', error);
-    res.status(500).json({ error: 'Download failed' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Download failed' });
+    }
   }
 };
 

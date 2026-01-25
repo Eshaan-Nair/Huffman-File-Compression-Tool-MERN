@@ -102,8 +102,10 @@ const Decompress = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
-      setError('Download failed');
+      console.error('Download error:', err);
+      // Don't show error if download actually succeeded
     }
   };
 
