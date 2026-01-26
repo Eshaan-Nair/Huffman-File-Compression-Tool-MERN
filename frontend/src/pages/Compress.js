@@ -103,7 +103,6 @@ const Compress = () => {
       });
       setLoading(false);
     } catch (err) {
-      console.error('Compression error:', err);
       setError(err.response?.data?.message || err.response?.data?.error || 'Compression failed');
       setLoading(false);
     }
@@ -111,11 +110,6 @@ const Compress = () => {
 
   const handleDownload = () => {
     try {
-      if (!result || !result.zipData) {
-        setError('No compressed data available');
-        return;
-      }
-
       // Convert base64 to blob
       const byteCharacters = atob(result.zipData);
       const byteNumbers = new Array(byteCharacters.length);
@@ -125,20 +119,17 @@ const Compress = () => {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'application/zip' });
       
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', result.fileName || 'compressed.zip');
+      link.setAttribute('download', result.fileName);
       document.body.appendChild(link);
       link.click();
-      
-      // Cleanup
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Download error:', err);
-      setError('Download failed: ' + err.message);
+      setError('Download failed');
     }
   };
 

@@ -86,7 +86,6 @@ const Decompress = () => {
       });
       setLoading(false);
     } catch (err) {
-      console.error('Decompression error:', err);
       setError(err.response?.data?.message || err.response?.data?.error || 'Decompression failed');
       setLoading(false);
     }
@@ -94,11 +93,6 @@ const Decompress = () => {
 
   const handleDownload = () => {
     try {
-      if (!result || !result.pdfData) {
-        setError('No decompressed data available');
-        return;
-      }
-
       // Convert base64 to blob
       const byteCharacters = atob(result.pdfData);
       const byteNumbers = new Array(byteCharacters.length);
@@ -108,20 +102,17 @@ const Decompress = () => {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'application/pdf' });
       
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', result.fileName || 'decompressed.pdf');
+      link.setAttribute('download', result.fileName);
       document.body.appendChild(link);
       link.click();
-      
-      // Cleanup
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Download error:', err);
-      setError('Download failed: ' + err.message);
+      setError('Download failed');
     }
   };
 
@@ -215,7 +206,7 @@ const Decompress = () => {
             </div>
             <div className="info-row">
               <span className="info-label">📕 Decompressed File:</span>
-              <span className="info-value">{result.fileName}</span>
+              <span className="info-value">{result.file}</span>
             </div>
           </div>
 

@@ -1,229 +1,154 @@
-import React, { useState } from 'react';
-import axios from '../api/axios';
-import './Decompress.css';
+const multipart = require('parse-multipart-data');
+const unzipper = require('unzipper');
+const { createPDFFromText } = require('../../backend/utils/pdfUtils');
+const { decompress } = require('../../backend/utils/huffman');
+const { Readable } = require('stream');
 
-const Decompress = () => {
-  const [zipFile, setZipFile] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-  const [dragActive, setDragActive] = useState(false);
+exports.handler = async (event, context) => {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
 
-  const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' };
+  }
 
-  const validateFile = (file) => {
-    if (!file) return 'No file selected';
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'Method not allowed' })
+    };
+  }
+
+  try {
+    // Parse multipart form data
+    const boundary = event.headers['content-type'].split('boundary=')[1];
+    const parts = multipart.parse(Buffer.from(event.body, 'base64'), boundary);
     
-    if (file.size > MAX_FILE_SIZE) {
-      return `File size exceeds 25MB limit`;
+    const filePart = parts.find(part => part.name === 'file');
+    if (!filePart) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'No file uploaded' })
+      };
     }
 
-    const fileName = file.name.toLowerCase();
-    if (!fileName.endsWith('.zip')) {
-      return 'Please select a ZIP file';
+    const zipBuffer = filePart.data;
+    const fileName = filePart.filename;
+
+    // Check if ZIP
+    if (!fileName.toLowerCase().endsWith('.zip')) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Only ZIP files are allowed for decompression' })
+      };
     }
 
-    return null;
-  };
-
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    processFile(selectedFile);
-  };
-
-  const processFile = (file) => {
-    const validationError = validateFile(file);
-    if (validationError) {
-      setError(validationError);
-      setZipFile(null);
-      return;
-    }
-    setZipFile(file);
-    setError(null);
-    setResult(null);
-  };
-
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleDecompress = async () => {
-    if (!zipFile) {
-      setError('Please select a ZIP file');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    const formData = new FormData();
-    formData.append('file', zipFile);
-
-    try {
-      const response = await axios.post('/decompress', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      setResult({
-        ...response.data,
-        downloadReady: true
-      });
-      setLoading(false);
-    } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'Decompression failed');
-      setLoading(false);
-    }
-  };
-
-  const handleDownload = () => {
-    try {
-      // Convert base64 to blob
-      const byteCharacters = atob(result.pdfData);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    // Extract ZIP
+    const stream = Readable.from(zipBuffer);
+    const directory = await unzipper.Open.buffer(zipBuffer);
+    
+    let combinedData = null;
+    
+    for (const file of directory.files) {
+      if (file.path === 'compressed.dat') {
+        combinedData = await file.buffer();
+        break;
       }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'application/pdf' });
-      
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', result.fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Download error:', err);
-      setError('Download failed');
     }
-  };
 
-  const formatBytes = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+    if (!combinedData) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Invalid compressed file. Missing required data.' })
+      };
+    }
 
-  return (
-    <div className="decompress-container">
-      <h1 className="page-title">📂 Decompress PDF</h1>
+    // Extract metadata length
+    const metadataLength = combinedData.readUInt32BE(0);
+
+    // Extract metadata
+    const metadataBuffer = combinedData.slice(4, 4 + metadataLength);
+    const metadata = JSON.parse(metadataBuffer.toString('utf8'));
+
+    // Extract compressed data
+    const compressedData = combinedData.slice(4 + metadataLength);
+
+    const { codes, originalLength, originalFileName } = metadata;
+
+    // Perform decompression
+    const decompressedData = decompress(compressedData, codes, originalLength);
+
+    // Create PDF from decompressed text
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      const chunks = [];
+      const PDFDocument = require('pdfkit');
+      const doc = new PDFDocument({
+        size: 'A4',
+        margins: { top: 72, bottom: 72, left: 72, right: 72 }
+      });
+
+      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      doc.fontSize(11);
+      doc.font('Helvetica');
+
+      const lines = decompressedData.split('\n');
       
-      <div className="upload-section">
-        <div className="file-upload-group">
-          <h3>📦 Upload Compressed ZIP File</h3>
-          <div 
-            className={`file-drop-zone ${dragActive ? 'drag-active' : ''}`}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-          >
-            <input
-              type="file"
-              id="zip-input"
-              onChange={handleFileChange}
-              accept=".zip,application/zip,application/x-zip-compressed"
-              className="file-input"
-            />
-            <label htmlFor="zip-input" className="file-label">
-              <div className="upload-icon">📦</div>
-              <p className="upload-text">
-                {zipFile ? (
-                  <>
-                    <span className="file-icon">✓</span>
-                    <span className="file-name">{zipFile.name}</span>
-                  </>
-                ) : (
-                  <>Drop your ZIP file here or <span className="browse-link">browse</span></>
-                )}
-              </p>
-              <p className="upload-hint">Only ZIP files from compression (Max 25MB)</p>
-            </label>
-          </div>
-        </div>
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        
+        if (doc.y > doc.page.height - 100) {
+          doc.addPage();
+        }
+        
+        if (line.trim() === '') {
+          doc.moveDown(0.5);
+        } else {
+          doc.text(line, {
+            width: doc.page.width - 144,
+            align: 'left',
+            lineGap: 2
+          });
+        }
+      }
 
-        {zipFile && (
-          <div className="files-info">
-            <div className="file-info-item">
-              <span className="info-icon">✅</span>
-              <span>ZIP file: <strong>{zipFile.name}</strong> ({formatBytes(zipFile.size)})</span>
-            </div>
-          </div>
-        )}
+      doc.end();
+    });
 
-        <button
-          onClick={handleDecompress}
-          disabled={!zipFile || loading}
-          className="decompress-btn-action"
-        >
-          {loading ? (
-            <>
-              <span className="spinner"></span>
-              Decompressing...
-            </>
-          ) : (
-            '📂 Decompress to PDF'
-          )}
-        </button>
+    // Return PDF as base64
+    return {
+      statusCode: 200,
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        success: true,
+        message: 'PDF decompressed successfully',
+        pdfData: pdfBuffer.toString('base64'),
+        fileName: originalFileName || 'decompressed.pdf',
+        originalFileName: originalFileName || 'unknown.pdf'
+      })
+    };
 
-        {error && <div className="error-message">❌ {error}</div>}
-      </div>
-
-      {result && (
-        <div className="result-section">
-          <h2>✅ Decompression Complete!</h2>
-          
-          <div className="success-animation">
-            <div className="checkmark-circle">
-              <div className="checkmark">✓</div>
-            </div>
-          </div>
-
-          <div className="success-info">
-            <div className="info-row">
-              <span className="info-label">📄 Original PDF Name:</span>
-              <span className="info-value">{result.originalFileName}</span>
-            </div>
-            <div className="info-row">
-              <span className="info-label">📕 Decompressed File:</span>
-              <span className="info-value">{result.file}</span>
-            </div>
-          </div>
-
-          <button
-            onClick={handleDownload}
-            className="download-btn"
-          >
-            📥 Download Decompressed PDF
-          </button>
-
-          <div className="info-note">
-            <strong>✨ Success!</strong> Your PDF has been restored to its original form.
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  } catch (error) {
+    console.error('Decompression error:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({
+        error: 'Decompression failed',
+        message: error.message
+      })
+    };
+  }
 };
-
-export default Decompress;
