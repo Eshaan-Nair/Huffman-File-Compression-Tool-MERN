@@ -41,9 +41,8 @@ function createPDFFromText(textData, outputPath) {
       // Parse text data if it's an object
       let text = typeof textData === 'string' ? textData : textData.text || textData;
       
-      // Set font and size
+      // Set font size - don't explicitly set font to avoid path issues
       doc.fontSize(11);
-      doc.font('Helvetica');
 
       // Split text into lines to preserve line breaks
       const lines = text.split('\n');

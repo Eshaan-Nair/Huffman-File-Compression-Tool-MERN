@@ -1,6 +1,5 @@
 const multipart = require('parse-multipart-data');
 const unzipper = require('unzipper');
-const { createPDFFromText } = require('../../backend/utils/pdfUtils');
 const { decompress } = require('../../backend/utils/huffman');
 const { Readable } = require('stream');
 
@@ -50,7 +49,6 @@ exports.handler = async (event, context) => {
     }
 
     // Extract ZIP
-    const stream = Readable.from(zipBuffer);
     const directory = await unzipper.Open.buffer(zipBuffer);
     
     let combinedData = null;
@@ -85,10 +83,12 @@ exports.handler = async (event, context) => {
     // Perform decompression
     const decompressedData = decompress(compressedData, codes, originalLength);
 
-    // Create PDF from decompressed text
+    // Create PDF from decompressed text - FIX FOR NETLIFY
     const pdfBuffer = await new Promise((resolve, reject) => {
       const chunks = [];
       const PDFDocument = require('pdfkit');
+      
+      // Create document without specifying font initially
       const doc = new PDFDocument({
         size: 'A4',
         margins: { top: 72, bottom: 72, left: 72, right: 72 }
@@ -98,8 +98,11 @@ exports.handler = async (event, context) => {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
+      // Set font size first
       doc.fontSize(11);
-      doc.font('Helvetica');
+      
+      // Don't explicitly set font - use default
+      // doc.font('Helvetica'); // This causes the error in serverless
 
       const lines = decompressedData.split('\n');
       
