@@ -80,7 +80,10 @@ const Decompress = () => {
           'Content-Type': 'multipart/form-data'
         }
       });
-      setResult(response.data);
+      setResult({
+        ...response.data,
+        downloadReady: true
+      });
       setLoading(false);
     } catch (err) {
       setError(err.response?.data?.message || err.response?.data?.error || 'Decompression failed');
@@ -88,22 +91,28 @@ const Decompress = () => {
     }
   };
 
-  const handleDownload = async (filename) => {
+  const handleDownload = () => {
     try {
-      const response = await axios.get(`/download/${filename}`, {
-        responseType: 'blob'
-      });
+      // Convert base64 to blob
+      const byteCharacters = atob(result.pdfData);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
       
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', filename);
+      link.setAttribute('download', result.fileName);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Download error:', err);
+      setError('Download failed');
     }
   };
 
@@ -202,7 +211,7 @@ const Decompress = () => {
           </div>
 
           <button
-            onClick={() => handleDownload(result.file)}
+            onClick={handleDownload}
             className="download-btn"
           >
             📥 Download Decompressed PDF
