@@ -18,7 +18,6 @@
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["fonts/Roboto_Condensed-Regular.ttf"]
   
 [[headers]]
   for = "/api/*"
