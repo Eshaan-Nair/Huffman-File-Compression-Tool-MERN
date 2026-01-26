@@ -3,6 +3,8 @@ const unzipper = require('unzipper');
 const { createPDFFromText } = require('../../backend/utils/pdfUtils');
 const { decompress } = require('../../backend/utils/huffman');
 const { Readable } = require('stream');
+const path = require('path');
+const fs = require('fs');  // Added for font loading
 
 exports.handler = async (event, context) => {
   const headers = {
@@ -27,8 +29,8 @@ exports.handler = async (event, context) => {
     // Parse multipart form data
     const boundary = event.headers['content-type'].split('boundary=')[1];
     const parts = multipart.parse(Buffer.from(event.body, 'base64'), boundary);
-    
     const filePart = parts.find(part => part.name === 'file');
+
     if (!filePart) {
       return {
         statusCode: 400,
@@ -52,9 +54,8 @@ exports.handler = async (event, context) => {
     // Extract ZIP
     const stream = Readable.from(zipBuffer);
     const directory = await unzipper.Open.buffer(zipBuffer);
-    
     let combinedData = null;
-    
+
     for (const file of directory.files) {
       if (file.path === 'compressed.dat') {
         combinedData = await file.buffer();
@@ -72,14 +73,11 @@ exports.handler = async (event, context) => {
 
     // Extract metadata length
     const metadataLength = combinedData.readUInt32BE(0);
-
     // Extract metadata
     const metadataBuffer = combinedData.slice(4, 4 + metadataLength);
     const metadata = JSON.parse(metadataBuffer.toString('utf8'));
-
     // Extract compressed data
     const compressedData = combinedData.slice(4 + metadataLength);
-
     const { codes, originalLength, originalFileName } = metadata;
 
     // Perform decompression
@@ -98,18 +96,25 @@ exports.handler = async (event, context) => {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
+      // Load Roboto Condensed font from bundle
+      const fontPath = path.join(__dirname, 'fonts', 'Roboto_Condensed-Regular.ttf');
+      try {
+        doc.registerFont('RobotoCondensed', fontPath);
+        doc.font('RobotoCondensed');
+      } catch (fontError) {
+        console.error('Font load error, falling back to Courier:', fontError);
+        doc.font('Courier');  // Fallback to avoid crash
+      }
+
       doc.fontSize(11);
-      doc.font('Helvetica');
 
       const lines = decompressedData.split('\n');
-      
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        
         if (doc.y > doc.page.height - 100) {
           doc.addPage();
         }
-        
         if (line.trim() === '') {
           doc.moveDown(0.5);
         } else {
