@@ -1,7 +1,8 @@
 const multipart = require('parse-multipart-data');
 const unzipper = require('unzipper');
 const { decompress } = require('../../backend/utils/huffman');
-const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+const { Readable } = require('stream');
+const path = require('path');
 
 exports.handler = async (event, context) => {
   const headers = {
@@ -83,40 +84,47 @@ exports.handler = async (event, context) => {
     // Perform decompression
     const decompressedData = decompress(compressedData, codes, originalLength);
 
-    // Create PDF using pdf-lib (NO external font files needed)
-    const pdfDoc = await PDFDocument.create();
-    const font = await pdfDoc.embedFont(StandardFonts.Courier);
-    
-    const fontSize = 11;
-    const margin = 50;
-    
-    let page = pdfDoc.addPage();
-    const { width, height } = page.getSize();
-    let y = height - margin;
-    
-    const lines = decompressedData.split('\n');
-    
-    for (const line of lines) {
-      // Check if we need a new page
-      if (y < margin + fontSize) {
-        page = pdfDoc.addPage();
-        y = height - margin;
-      }
+    // Create PDF from decompressed text
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      const chunks = [];
+      const PDFDocument = require('pdfkit');
       
-      // Draw text
-      page.drawText(line || ' ', {
-        x: margin,
-        y: y,
-        size: fontSize,
-        font: font,
-        color: rgb(0, 0, 0),
+      const doc = new PDFDocument({
+        size: 'A4',
+        margins: { top: 72, bottom: 72, left: 72, right: 72 },
+        font: 'Courier'
       });
+
+      // commented out to use default font
+      // doc.font('Times-Roman');
+      doc.fontSize(11);
+
+      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const lines = decompressedData.split('\n');
       
-      y -= fontSize + 4; // Line height
-    }
-    
-    const pdfBytes = await pdfDoc.save();
-    const pdfBuffer = Buffer.from(pdfBytes);
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        
+        if (doc.y > doc.page.height - 100) {
+          doc.addPage();
+        }
+        
+        if (line.trim() === '') {
+          doc.moveDown(0.5);
+        } else {
+          doc.text(line, {
+            width: doc.page.width - 144,
+            align: 'left',
+            lineGap: 2
+          });
+        }
+      }
+
+      doc.end();
+    });
 
     // Return PDF as base64
     return {
