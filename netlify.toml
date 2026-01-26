@@ -6,11 +6,13 @@
 [build.environment]
   NODE_VERSION = "18"
 
+# Redirect API calls to Netlify Functions
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
+# SPA fallback - must be last
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -18,9 +20,14 @@
 
 [functions]
   node_bundler = "esbuild"
-  
+  # Increase timeout for large file processing
+  [functions.compress]
+    timeout = 60
+  [functions.decompress]
+    timeout = 60
+
 [[headers]]
-  for = "/api/*"
+  for = "/.netlify/functions/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Headers = "Content-Type"
