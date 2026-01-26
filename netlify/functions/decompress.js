@@ -1,8 +1,8 @@
 const multipart = require('parse-multipart-data');
 const unzipper = require('unzipper');
+const { createPDFFromText } = require('../../backend/utils/pdfUtils');
 const { decompress } = require('../../backend/utils/huffman');
 const { Readable } = require('stream');
-const path = require('path');
 
 exports.handler = async (event, context) => {
   const headers = {
@@ -50,6 +50,7 @@ exports.handler = async (event, context) => {
     }
 
     // Extract ZIP
+    const stream = Readable.from(zipBuffer);
     const directory = await unzipper.Open.buffer(zipBuffer);
     
     let combinedData = null;
@@ -88,20 +89,17 @@ exports.handler = async (event, context) => {
     const pdfBuffer = await new Promise((resolve, reject) => {
       const chunks = [];
       const PDFDocument = require('pdfkit');
-      
       const doc = new PDFDocument({
         size: 'A4',
-        margins: { top: 72, bottom: 72, left: 72, right: 72 },
-        font: 'Courier'
+        margins: { top: 72, bottom: 72, left: 72, right: 72 }
       });
-
-      // commented out to use default font
-      // doc.font('Times-Roman');
-      doc.fontSize(11);
 
       doc.on('data', chunk => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
+
+      doc.fontSize(11);
+      doc.font('Helvetica');
 
       const lines = decompressedData.split('\n');
       
