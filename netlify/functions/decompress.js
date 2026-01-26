@@ -91,11 +91,12 @@ exports.handler = async (event, context) => {
       
       const doc = new PDFDocument({
         size: 'A4',
-        margins: { top: 72, bottom: 72, left: 72, right: 72 }
+        margins: { top: 72, bottom: 72, left: 72, right: 72 },
+        font: 'Courier'
       });
 
-      // Set a safe built-in font
-      doc.font('Times-Roman');
+      // commented out to use default font
+      // doc.font('Times-Roman');
       doc.fontSize(11);
 
       doc.on('data', chunk => chunks.push(chunk));
