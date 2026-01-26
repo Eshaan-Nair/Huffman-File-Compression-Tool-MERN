@@ -1,7 +1,6 @@
 const multipart = require('parse-multipart-data');
 const unzipper = require('unzipper');
-const { createPDFFromText } = require('../../backend/utils/pdfUtils');
-const { decompress } = require('../../backend/utils/huffman');
+const decompress = require('./backend/utils/huffman');
 const { Readable } = require('stream');
 
 exports.handler = async (event, context) => {
@@ -24,10 +23,13 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Parse multipart form data
+    // Parse multipart
     const boundary = event.headers['content-type'].split('boundary=')[1];
-    const parts = multipart.parse(Buffer.from(event.body, 'base64'), boundary);
-    
+    const parts = multipart.parse(
+      Buffer.from(event.body, 'base64'),
+      boundary
+    );
+
     const filePart = parts.find(part => part.name === 'file');
     if (!filePart) {
       return {
@@ -45,16 +47,13 @@ exports.handler = async (event, context) => {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Only ZIP files are allowed for decompression' })
+        body: JSON.stringify({ error: 'Only ZIP files are allowed' })
       };
     }
 
-    // Extract ZIP
-    const stream = Readable.from(zipBuffer);
+    // Extract ZIP in memory
     const directory = await unzipper.Open.buffer(zipBuffer);
-    
     let combinedData = null;
-    
     for (const file of directory.files) {
       if (file.path === 'compressed.dat') {
         combinedData = await file.buffer();
@@ -70,14 +69,10 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Extract metadata length
-    const metadataLength = combinedData.readUInt32BE(0);
-
     // Extract metadata
+    const metadataLength = combinedData.readUInt32BE(0);
     const metadataBuffer = combinedData.slice(4, 4 + metadataLength);
-    const metadata = JSON.parse(metadataBuffer.toString('utf8'));
-
-    // Extract compressed data
+    const metadata = JSON.parse(metadataBuffer.toString('utf-8'));
     const compressedData = combinedData.slice(4 + metadataLength);
 
     const { codes, originalLength, originalFileName } = metadata;
@@ -85,46 +80,7 @@ exports.handler = async (event, context) => {
     // Perform decompression
     const decompressedData = decompress(compressedData, codes, originalLength);
 
-    // Create PDF from decompressed text
-    const pdfBuffer = await new Promise((resolve, reject) => {
-      const chunks = [];
-      const PDFDocument = require('pdfkit');
-      const doc = new PDFDocument({
-        size: 'A4',
-        margins: { top: 72, bottom: 72, left: 72, right: 72 }
-      });
-
-      doc.on('data', chunk => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
-
-      doc.fontSize(11);
-      doc.font('Helvetica');
-
-      const lines = decompressedData.split('\n');
-      
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        
-        if (doc.y > doc.page.height - 100) {
-          doc.addPage();
-        }
-        
-        if (line.trim() === '') {
-          doc.moveDown(0.5);
-        } else {
-          doc.text(line, {
-            width: doc.page.width - 144,
-            align: 'left',
-            lineGap: 2
-          });
-        }
-      }
-
-      doc.end();
-    });
-
-    // Return PDF as base64
+    // Return text as base64
     return {
       statusCode: 200,
       headers: {
@@ -133,22 +89,18 @@ exports.handler = async (event, context) => {
       },
       body: JSON.stringify({
         success: true,
-        message: 'PDF decompressed successfully',
-        pdfData: pdfBuffer.toString('base64'),
-        fileName: originalFileName || 'decompressed.pdf',
-        originalFileName: originalFileName || 'unknown.pdf'
+        message: 'Text file decompressed successfully',
+        textData: Buffer.from(decompressedData, 'utf-8').toString('base64'),
+        fileName: originalFileName ? originalFileName.replace('.txt', '_decompressed.txt') : 'decompressed.txt',
+        originalFileName: originalFileName || 'unknown.txt'
       })
     };
-
   } catch (error) {
     console.error('Decompression error:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({
-        error: 'Decompression failed',
-        message: error.message
-      })
+      body: JSON.stringify({ error: 'Decompression failed', message: error.message })
     };
   }
 };

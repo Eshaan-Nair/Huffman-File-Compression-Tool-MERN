@@ -13,29 +13,18 @@ const Compress = () => {
   const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 
   const validateFile = (selectedFile) => {
-    if (!selectedFile) {
-      return 'No file selected';
+    if (!selectedFile) return 'No file selected';
+    if (selectedFile.type !== 'text/plain' && !selectedFile.name.toLowerCase().endsWith('.txt')) {
+      return 'Only .txt files are allowed';
     }
-
-    if (selectedFile.type !== 'application/pdf') {
-      return 'Only PDF files are allowed';
-    }
-
     if (selectedFile.size > MAX_FILE_SIZE) {
       return `File size exceeds 25MB limit. Your file is ${(selectedFile.size / 1024 / 1024).toFixed(2)}MB`;
     }
-
     return null;
-  };
-
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    processFile(selectedFile);
   };
 
   const processFile = async (selectedFile) => {
     const validationError = validateFile(selectedFile);
-    
     if (validationError) {
       setError(validationError);
       setFile(null);
@@ -51,18 +40,23 @@ const Compress = () => {
     const preview = {
       name: selectedFile.name,
       size: selectedFile.size,
-      type: selectedFile.type,
+      type: selectedFile.type || 'text/plain',
       lastModified: new Date(selectedFile.lastModified).toLocaleString()
     };
     setFilePreview(preview);
   };
 
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    processFile(selectedFile);
+  };
+
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
+    if (e.type === 'dragenter' || e.type === 'dragover') {
       setDragActive(true);
-    } else if (e.type === "dragleave") {
+    } else if (e.type === 'dragleave') {
       setDragActive(false);
     }
   };
@@ -71,7 +65,6 @@ const Compress = () => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       processFile(e.dataTransfer.files[0]);
     }
@@ -79,10 +72,9 @@ const Compress = () => {
 
   const handleCompress = async () => {
     if (!file) {
-      setError('Please select a PDF file first');
+      setError('Please select a .txt file first');
       return;
     }
-
     setLoading(true);
     setError(null);
 
@@ -91,11 +83,8 @@ const Compress = () => {
 
     try {
       const response = await axios.post('/compress', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
       // Store result with base64 data
       setResult({
         ...response.data,
@@ -118,7 +107,6 @@ const Compress = () => {
       }
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'application/zip' });
-      
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -143,98 +131,90 @@ const Compress = () => {
 
   const getCompressionPercentage = () => {
     if (!result) return 0;
-    return 100 - parseFloat(result.stats.compressionRatio);
+    return (100 - parseFloat(result.stats.compressionRatio)).toFixed(0);
   };
 
   return (
     <div className="compress-container">
-      <h1 className="page-title">🗜️ Compress PDF</h1>
-      
+      <h1 className="page-title">Compress Text File</h1>
       <div className="upload-section">
-        <div 
-          className={`file-drop-zone ${dragActive ? 'drag-active' : ''}`}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-        >
+        <div className={`file-drop-zone ${dragActive ? 'drag-active' : ''}`}
+             onDragEnter={handleDrag}
+             onDragLeave={handleDrag}
+             onDragOver={handleDrag}
+             onDrop={handleDrop}>
           <input
             type="file"
             id="file-input"
             onChange={handleFileChange}
-            accept=".pdf,application/pdf"
+            accept=".txt,text/plain"
             className="file-input"
           />
           <label htmlFor="file-input" className="file-label">
-            <div className="upload-icon">📕</div>
+            <div className="upload-icon"></div>
             <p className="upload-text">
               {file ? (
                 <>
-                  <span className="file-icon">✓</span>
+                  <span className="file-icon"></span>
                   <span className="file-name">{file.name}</span>
                 </>
               ) : (
                 <>
-                  <strong>Drop your PDF here</strong> or <span className="browse-link">browse</span>
+                  <strong>Drop your .txt file here</strong> or <span className="browse-link">browse</span>
                 </>
               )}
             </p>
-            <p className="upload-hint">Only PDF files (Max 25MB)</p>
+            <p className="upload-hint">Only .txt files. Max 25MB</p>
           </label>
         </div>
-
         {filePreview && (
           <div className="file-preview">
-            <h3 className="preview-title">📄 File Preview</h3>
+            <h3 className="preview-title">File Preview</h3>
             <div className="preview-grid">
               <div className="preview-item">
-                <span className="preview-label">Filename:</span>
+                <span className="preview-label">Filename</span>
                 <span className="preview-value">{filePreview.name}</span>
               </div>
               <div className="preview-item">
-                <span className="preview-label">Size:</span>
+                <span className="preview-label">Size</span>
                 <span className="preview-value">{formatBytes(filePreview.size)}</span>
               </div>
               <div className="preview-item">
-                <span className="preview-label">Type:</span>
-                <span className="preview-value">PDF Document</span>
+                <span className="preview-label">Type</span>
+                <span className="preview-value">Text File</span>
               </div>
               <div className="preview-item">
-                <span className="preview-label">Modified:</span>
+                <span className="preview-label">Modified</span>
                 <span className="preview-value">{filePreview.lastModified}</span>
               </div>
             </div>
           </div>
         )}
-
         <button
           onClick={handleCompress}
           disabled={!file || loading}
-          className="compress-btn-action"
+          className={`compress-btn ${(!file || loading) ? 'disabled' : 'action'}`}
         >
           {loading ? (
             <>
               <span className="spinner"></span>
-              Compressing PDF...
+              Compressing Text...
             </>
           ) : (
-            '🗜️ Compress PDF'
+            'Compress Text File'
           )}
         </button>
-
-        {error && <div className="error-message">❌ {error}</div>}
+        {error && <div className="error-message">{error}</div>}
       </div>
-
       {result && (
         <div className="result-section">
-          <h2>✅ Compression Complete!</h2>
-          
+          <h2>Compression Complete!</h2>
           <div className="compression-visual">
             <div className="size-comparison">
               <div className="size-bar original-bar">
                 <div className="bar-label">Original Size</div>
                 <div className="bar-container">
-                  <div className="bar-fill original-fill" style={{width: '100%'}}>
+                  <div className="bar-fill original-fill" style={{ width: '100%' }}>
                     {formatBytes(result.stats.originalSize)}
                   </div>
                 </div>
@@ -242,56 +222,46 @@ const Compress = () => {
               <div className="size-bar compressed-bar">
                 <div className="bar-label">Compressed Size</div>
                 <div className="bar-container">
-                  <div 
-                    className="bar-fill compressed-fill" 
-                    style={{width: result.stats.compressionRatio}}
-                  >
+                  <div className="bar-fill compressed-fill" style={{ width: `${result.stats.compressionRatio}%` }}>
                     {formatBytes(result.stats.compressedSize)}
                   </div>
                 </div>
               </div>
             </div>
-
             <div className="savings-badge">
-              <div className="savings-percentage">{getCompressionPercentage().toFixed(0)}%</div>
+              <div className="savings-percentage">{getCompressionPercentage()}%</div>
               <div className="savings-label">Space Saved</div>
               <div className="savings-amount">{formatBytes(result.stats.spaceSaved)}</div>
             </div>
           </div>
-
           <div className="stats-grid">
             <div className="stat-card">
-              <div className="stat-icon">📊</div>
+              <div className="stat-icon"></div>
               <div className="stat-info">
                 <div className="stat-label">Original</div>
                 <div className="stat-value">{formatBytes(result.stats.originalSize)}</div>
               </div>
             </div>
             <div className="stat-card">
-              <div className="stat-icon">📦</div>
+              <div className="stat-icon"></div>
               <div className="stat-info">
                 <div className="stat-label">Compressed</div>
                 <div className="stat-value">{formatBytes(result.stats.compressedSize)}</div>
               </div>
             </div>
             <div className="stat-card highlight">
-              <div className="stat-icon">💾</div>
+              <div className="stat-icon"></div>
               <div className="stat-info">
                 <div className="stat-label">Saved</div>
                 <div className="stat-value">{formatBytes(result.stats.spaceSaved)}</div>
               </div>
             </div>
           </div>
-
-          <button
-            onClick={handleDownload}
-            className="download-btn"
-          >
-            📥 Download Compressed ZIP
+          <button onClick={handleDownload} className="download-btn">
+            Download Compressed ZIP
           </button>
-
           <div className="info-note">
-            <strong>ℹ️ Note:</strong> The ZIP file contains everything needed for decompression. Just upload this single file when you want to decompress!
+            <strong>Note:</strong> The ZIP file contains everything needed for decompression. Just upload this single file when you want to decompress!
           </div>
         </div>
       )}

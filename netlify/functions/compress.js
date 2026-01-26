@@ -1,6 +1,5 @@
 const multipart = require('parse-multipart-data');
-const { extractTextFromPDF, createPDFFromText } = require('../../backend/utils/pdfUtils');
-const { compress } = require('../../backend/utils/huffman');
+const compress = require('./backend/utils/huffman');
 const archiver = require('archiver');
 
 exports.handler = async (event, context) => {
@@ -13,7 +12,11 @@ exports.handler = async (event, context) => {
 
   // Handle preflight
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
+    return {
+      statusCode: 200,
+      headers,
+      body: ''
+    };
   }
 
   if (event.httpMethod !== 'POST') {
@@ -27,8 +30,11 @@ exports.handler = async (event, context) => {
   try {
     // Parse multipart form data
     const boundary = event.headers['content-type'].split('boundary=')[1];
-    const parts = multipart.parse(Buffer.from(event.body, 'base64'), boundary);
-    
+    const parts = multipart.parse(
+      Buffer.from(event.body, 'base64'),
+      boundary
+    );
+
     const filePart = parts.find(part => part.name === 'file');
     if (!filePart) {
       return {
@@ -41,29 +47,27 @@ exports.handler = async (event, context) => {
     const fileBuffer = filePart.data;
     const fileName = filePart.filename;
 
-    // Check if PDF
-    if (!fileName.toLowerCase().endsWith('.pdf')) {
+    // Check if text file
+    if (!fileName.toLowerCase().endsWith('.txt')) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Only PDF files are allowed' })
+        body: JSON.stringify({ error: 'Only .txt files are allowed' })
       };
     }
 
-    // Extract text from PDF
-    const extractedData = await extractTextFromPDF(fileBuffer);
-    const fileData = typeof extractedData === 'string' ? extractedData : extractedData.text;
-
-    if (!fileData || fileData.trim().length === 0) {
+    // Read text content directly (UTF-8)
+    const fileData = fileBuffer.toString('utf-8').trim();
+    if (fileData.length === 0) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'PDF is empty or contains no extractable text' })
+        body: JSON.stringify({ error: 'Text file is empty' })
       };
     }
 
-    // Perform compression
-    const { compressedData, codes, originalLength, encodedLength } = compress(fileData);
+    // Perform Huffman compression
+    const [compressedData, codes, originalLength, encodedLength] = compress(fileData);
 
     // Create metadata
     const metadataObj = {
@@ -73,25 +77,21 @@ exports.handler = async (event, context) => {
       originalFileName: fileName,
       timestamp: Date.now()
     };
-
     const metadataStr = JSON.stringify(metadataObj);
-    const metadataBuffer = Buffer.from(metadataStr, 'utf8');
+    const metadataBuffer = Buffer.from(metadataStr, 'utf-8');
     const metadataLength = Buffer.alloc(4);
     metadataLength.writeUInt32BE(metadataBuffer.length, 0);
 
-    // Combine metadata and compressed data
+    // Combine metadata + compressed data
     const combinedData = Buffer.concat([metadataLength, metadataBuffer, compressedData]);
 
     // Create ZIP in memory
     const chunks = [];
     const archive = archiver('zip', { zlib: { level: 9 } });
-
-    archive.on('data', (chunk) => chunks.push(chunk));
-    
+    archive.on('data', chunk => chunks.push(chunk));
     await new Promise((resolve, reject) => {
-      archive.on('end', resolve);
+      archive.on('end', () => resolve());
       archive.on('error', reject);
-      
       archive.append(combinedData, { name: 'compressed.dat' });
       archive.finalize();
     });
@@ -100,7 +100,6 @@ exports.handler = async (event, context) => {
     const originalSize = fileBuffer.length;
     const compressedSize = zipBuffer.length;
     const compressionRatio = ((compressedSize / originalSize) * 100).toFixed(2);
-    const spaceSaved = originalSize - compressedSize;
 
     // Return ZIP as base64
     return {
@@ -111,28 +110,24 @@ exports.handler = async (event, context) => {
       },
       body: JSON.stringify({
         success: true,
-        message: 'PDF compressed successfully',
+        message: 'Text file compressed successfully',
         stats: {
           originalSize,
           compressedSize,
-          compressionRatio: `${compressionRatio}%`,
-          spaceSaved
+          compressionRatio,
+          spaceSaved: originalSize - compressedSize
         },
         zipData: zipBuffer.toString('base64'),
-        fileName: fileName.replace('.pdf', '.zip'),
+        fileName: fileName.replace('.txt', '.zip'),
         originalFileName: fileName
       })
     };
-
   } catch (error) {
     console.error('Compression error:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({
-        error: 'Compression failed',
-        message: error.message
-      })
+      body: JSON.stringify({ error: 'Compression failed', message: error.message })
     };
   }
 };

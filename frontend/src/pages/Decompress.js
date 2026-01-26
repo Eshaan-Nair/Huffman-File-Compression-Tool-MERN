@@ -13,16 +13,13 @@ const Decompress = () => {
 
   const validateFile = (file) => {
     if (!file) return 'No file selected';
-    
     if (file.size > MAX_FILE_SIZE) {
       return `File size exceeds 25MB limit`;
     }
-
     const fileName = file.name.toLowerCase();
     if (!fileName.endsWith('.zip')) {
       return 'Please select a ZIP file';
     }
-
     return null;
   };
 
@@ -46,9 +43,9 @@ const Decompress = () => {
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
+    if (e.type === 'dragenter' || e.type === 'dragover') {
       setDragActive(true);
-    } else if (e.type === "dragleave") {
+    } else if (e.type === 'dragleave') {
       setDragActive(false);
     }
   };
@@ -67,7 +64,6 @@ const Decompress = () => {
       setError('Please select a ZIP file');
       return;
     }
-
     setLoading(true);
     setError(null);
 
@@ -76,9 +72,7 @@ const Decompress = () => {
 
     try {
       const response = await axios.post('/decompress', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
       setResult({
         ...response.data,
@@ -93,15 +87,14 @@ const Decompress = () => {
 
   const handleDownload = () => {
     try {
-      // Convert base64 to blob
-      const byteCharacters = atob(result.pdfData);
+      // Convert base64 text to blob
+      const byteCharacters = atob(result.textData);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
         byteNumbers[i] = byteCharacters.charCodeAt(i);
       }
       const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'application/pdf' });
-      
+      const blob = new Blob([byteArray], { type: 'text/plain;charset=utf-8' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -126,18 +119,15 @@ const Decompress = () => {
 
   return (
     <div className="decompress-container">
-      <h1 className="page-title">📂 Decompress PDF</h1>
-      
+      <h1 className="page-title">Decompress Text File</h1>
       <div className="upload-section">
         <div className="file-upload-group">
-          <h3>📦 Upload Compressed ZIP File</h3>
-          <div 
-            className={`file-drop-zone ${dragActive ? 'drag-active' : ''}`}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-          >
+          <h3>Upload Compressed ZIP File</h3>
+          <div className={`file-drop-zone ${dragActive ? 'drag-active' : ''}`}
+               onDragEnter={handleDrag}
+               onDragLeave={handleDrag}
+               onDragOver={handleDrag}
+               onDrop={handleDrop}>
             <input
               type="file"
               id="zip-input"
@@ -146,35 +136,37 @@ const Decompress = () => {
               className="file-input"
             />
             <label htmlFor="zip-input" className="file-label">
-              <div className="upload-icon">📦</div>
+              <div className="upload-icon"></div>
               <p className="upload-text">
                 {zipFile ? (
                   <>
-                    <span className="file-icon">✓</span>
+                    <span className="file-icon"></span>
                     <span className="file-name">{zipFile.name}</span>
                   </>
                 ) : (
-                  <>Drop your ZIP file here or <span className="browse-link">browse</span></>
+                  <>
+                    <strong>Drop your ZIP file here</strong> or <span className="browse-link">browse</span>
+                  </>
                 )}
               </p>
-              <p className="upload-hint">Only ZIP files from compression (Max 25MB)</p>
+              <p className="upload-hint">ZIP files from compression. Max 25MB</p>
             </label>
           </div>
         </div>
-
         {zipFile && (
           <div className="files-info">
             <div className="file-info-item">
-              <span className="info-icon">✅</span>
-              <span>ZIP file: <strong>{zipFile.name}</strong> ({formatBytes(zipFile.size)})</span>
+              <span className="info-icon"></span>
+              <span>
+                ZIP file <strong>{zipFile.name}</strong> ({formatBytes(zipFile.size)})
+              </span>
             </div>
           </div>
         )}
-
         <button
           onClick={handleDecompress}
           disabled={!zipFile || loading}
-          className="decompress-btn-action"
+          className={`decompress-btn ${(!zipFile || loading) ? 'disabled' : 'action'}`}
         >
           {loading ? (
             <>
@@ -182,43 +174,34 @@ const Decompress = () => {
               Decompressing...
             </>
           ) : (
-            '📂 Decompress to PDF'
+            'Decompress to Text'
           )}
         </button>
-
-        {error && <div className="error-message">❌ {error}</div>}
+        {error && <div className="error-message">{error}</div>}
       </div>
-
       {result && (
         <div className="result-section">
-          <h2>✅ Decompression Complete!</h2>
-          
+          <h2>Decompression Complete!</h2>
           <div className="success-animation">
             <div className="checkmark-circle">
-              <div className="checkmark">✓</div>
+              <div className="checkmark"></div>
             </div>
           </div>
-
           <div className="success-info">
             <div className="info-row">
-              <span className="info-label">📄 Original PDF Name:</span>
+              <span className="info-label">Original File Name</span>
               <span className="info-value">{result.originalFileName}</span>
             </div>
             <div className="info-row">
-              <span className="info-label">📕 Decompressed File:</span>
-              <span className="info-value">{result.file}</span>
+              <span className="info-label">Decompressed File</span>
+              <span className="info-value">{result.fileName}</span>
             </div>
           </div>
-
-          <button
-            onClick={handleDownload}
-            className="download-btn"
-          >
-            📥 Download Decompressed PDF
+          <button onClick={handleDownload} className="download-btn">
+            Download Decompressed Text (.txt)
           </button>
-
           <div className="info-note">
-            <strong>✨ Success!</strong> Your PDF has been restored to its original form.
+            <strong>Success!</strong> Your text file has been restored to its original form.
           </div>
         </div>
       )}
