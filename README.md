@@ -13,19 +13,19 @@
 
 ## Table of Contents
 
-- [Overview](#-overview)
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Architecture](#-architecture)
-- [Installation](#-installation)
-- [Usage](#-usage)
-- [API Reference](#-api-reference)
-- [Algorithm Explained](#-algorithm-explained)
-- [Project Structure](#-project-structure)
-- [Performance](#-performance)
-- [Screenshots](#-screenshots)
-- [Acknowledgments](#-acknowledgments)
-- [Author](#-author)
+- [Overview](#overview)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Usage](#usage)
+- [API Reference](#api-reference)
+- [Algorithm Explained](#algorithm-explained)
+- [Project Structure](#project-structure)
+- [Performance](#performance)
+- [Screenshots](#screenshots)
+- [Acknowledgments](#acknowledgments)
+- [Author](#author)
 
 ---
 
