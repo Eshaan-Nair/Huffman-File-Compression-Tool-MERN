@@ -2,6 +2,30 @@ import React, { useState, useRef } from 'react';
 import axios from '../api/axios';
 import './Decompress.css';
 
+const IconUpload = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+    <polyline points="17 8 12 3 7 8"></polyline>
+    <line x1="12" y1="3" x2="12" y2="15"></line>
+  </svg>
+);
+
+const IconArchive = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="21 8 21 21 3 21 3 8"></polyline>
+    <rect x="1" y="3" width="22" height="5"></rect>
+    <line x1="10" y1="12" x2="14" y2="12"></line>
+  </svg>
+);
+
+const IconDownload = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+    <polyline points="7 10 12 15 17 10"></polyline>
+    <line x1="12" y1="15" x2="12" y2="3"></line>
+  </svg>
+);
+
 const Decompress = () => {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -115,7 +139,6 @@ const Decompress = () => {
         responseType: 'blob'
       });
       
-      // Extract original name without timestamp
       const downloadName = result.originalFileName || filename.replace(/^\d+_/, '');
       
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -146,15 +169,15 @@ const Decompress = () => {
   };
 
   return (
-    <div className="decompress-container">
-      <h1 className="page-title">
-        <span className="icon">📦</span>
-        Decompress File
-      </h1>
+    <div className="app-page">
+      <div className="page-header">
+        <h1 className="page-title">Decompress File</h1>
+        <p className="page-subtitle">Select a ZIP archive to restore the original text file.</p>
+      </div>
       
-      <div className="upload-section">
+      <div className="panel">
         <div 
-          className={`file-drop-zone ${isDragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
+          className={`drop-zone ${isDragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
           onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -166,110 +189,86 @@ const Decompress = () => {
             ref={fileInputRef}
             onChange={handleFileChange}
             accept=".zip"
-            className="file-input"
+            className="file-input-hidden"
           />
           
           {!file ? (
-            <div className="drop-zone-content">
-              <div className="upload-icon">📦</div>
-              <p className="drop-text">
-                {isDragging ? 'Drop your ZIP file here' : 'Drag & drop your .zip file here'}
-              </p>
-              <p className="drop-subtext">or click to browse</p>
-              <div className="file-requirements">
-                <span className="requirement-badge">🗜️ .zip files only</span>
-                <span className="requirement-badge">📊 Max 25MB</span>
+            <div className="drop-content">
+              <div className="icon-circle">
+                <IconUpload />
               </div>
+              <p className="drop-title">Click to upload or drag and drop</p>
+              <p className="drop-desc">ZIP up to 25MB</p>
             </div>
           ) : (
-            <div className="file-preview">
-              <div className="file-icon">🗜️</div>
-              <div className="file-details">
-                <p className="file-name">{file.name}</p>
-                <p className="file-size">{formatBytes(file.size)}</p>
+            <div className="file-info">
+              <div className="file-info-left">
+                <IconArchive />
+                <div className="file-meta">
+                  <span className="file-name">{file.name}</span>
+                  <span className="file-size">{formatBytes(file.size)}</span>
+                </div>
               </div>
               <button 
-                className="clear-btn"
+                className="btn-clear"
                 onClick={(e) => {
                   e.stopPropagation();
                   clearFile();
                 }}
               >
-                ✕
+                Clear
               </button>
             </div>
           )}
         </div>
 
+        {error && (
+          <div className="alert-error">
+            {error}
+          </div>
+        )}
+
         {file && !result && (
           <button
             onClick={handleDecompress}
             disabled={loading}
-            className="decompress-btn-action"
+            className="btn btn-primary btn-block"
           >
-            {loading ? (
-              <>
-                <span className="spinner"></span>
-                Decompressing... {progress}%
-              </>
-            ) : (
-              <>
-                <span>📂</span>
-                Decompress File
-              </>
-            )}
+            {loading ? `Decompressing... ${progress}%` : 'Decompress File'}
           </button>
         )}
 
         {loading && (
-          <div className="progress-bar-container">
-            <div className="progress-bar" style={{ width: `${progress}%` }}></div>
-          </div>
-        )}
-
-        {error && (
-          <div className="error-message">
-            <span className="error-icon">⚠️</span>
-            {error}
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: `${progress}%` }}></div>
           </div>
         )}
       </div>
 
       {result && (
-        <div className="result-section">
-          <div className="success-header">
-            <span className="success-icon">✓</span>
-            <h2>Decompression Complete!</h2>
+        <div className="panel result-panel">
+          <div className="result-header">
+            <h3>Decompression Complete</h3>
           </div>
           
-          <div className="success-info">
-            <div className="info-item">
-              <span className="info-icon">📄</span>
-              <div className="info-content">
-                <span className="info-label">Original File Name</span>
-                <span className="info-value">{result.originalFileName}</span>
-              </div>
+          <div className="data-list">
+            <div className="data-row">
+              <span className="data-label">Original File</span>
+              <span className="data-value">{result.originalFileName}</span>
             </div>
-            <div className="info-item">
-              <span className="info-icon">📁</span>
-              <div className="info-content">
-                <span className="info-label">Decompressed File</span>
-                <span className="info-value">{result.file}</span>
-              </div>
+            <div className="data-row">
+              <span className="data-label">Decompressed File</span>
+              <span className="data-value">{result.file}</span>
             </div>
           </div>
 
           <button
             onClick={() => handleDownload(result.file)}
-            className="download-btn"
+            className="btn btn-primary btn-block"
           >
-            <span>📥</span>
+            <IconDownload />
             Download Text File
           </button>
-
-          <p className="note">
-            ✨ Your file has been successfully restored!
-          </p>
         </div>
       )}
     </div>

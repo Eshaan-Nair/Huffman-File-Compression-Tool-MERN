@@ -2,68 +2,71 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import './Home.css';
 
+const IconLightning = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+  </svg>
+);
+
+const IconSave = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+    <polyline points="7 3 7 8 15 8"></polyline>
+  </svg>
+);
+
+const IconLock = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+  </svg>
+);
+
 const Home = () => {
   return (
     <div className="home-container">
       <div className="hero-section">
-        <div className="hero-icon">🗜️</div>
-        <h1 className="home-title">Huffman Compression Tool</h1>
+        <span className="hero-badge">Huffman Coding Algorithm</span>
+        <h1 className="home-title">
+          Efficient file compression.
+        </h1>
         <p className="home-subtitle">
-          Compress your text files efficiently using the Huffman Coding Algorithm
+          Compress your text files efficiently using a minimal, high-performance algorithm. 
+          Save space securely without losing data.
         </p>
-        <p className="home-description">
-          Upload a .txt file to compress it into a .zip archive, or upload a .zip file to restore the original text
-        </p>
+        
+        <div className="home-buttons">
+          <Link to="/compress" className="btn btn-primary">
+            Compress Files
+          </Link>
+          <Link to="/decompress" className="btn btn-secondary">
+            Decompress Files
+          </Link>
+        </div>
       </div>
 
       <div className="features-grid">
         <div className="feature-card">
-          <div className="feature-icon">⚡</div>
-          <h3>Fast Compression</h3>
-          <p>Lightning-fast Huffman encoding algorithm</p>
+          <div className="feature-icon">
+            <IconLightning />
+          </div>
+          <h3>Lightning Fast</h3>
+          <p>Optimized Huffman encoding algorithm processes files in milliseconds.</p>
         </div>
         <div className="feature-card">
-          <div className="feature-icon">💾</div>
-          <h3>Space Saving</h3>
-          <p>Reduce file sizes significantly</p>
+          <div className="feature-icon">
+            <IconSave />
+          </div>
+          <h3>Maximum Savings</h3>
+          <p>Reduce file sizes significantly, saving valuable storage space.</p>
         </div>
         <div className="feature-card">
-          <div className="feature-icon">🔒</div>
-          <h3>Lossless</h3>
-          <p>Perfect restoration of original data</p>
-        </div>
-        <div className="feature-card">
-          <div className="feature-icon">🎯</div>
-          <h3>Easy to Use</h3>
-          <p>Simple drag & drop interface</p>
-        </div>
-      </div>
-
-      <div className="home-buttons">
-        <Link to="/compress" className="home-btn compress-btn">
-          <span className="btn-icon">🗜️</span>
-          <span className="btn-content">
-            <span className="btn-title">Compress Files</span>
-            <span className="btn-desc">.txt → .zip</span>
-          </span>
-        </Link>
-        <Link to="/decompress" className="home-btn decompress-btn">
-          <span className="btn-icon">📦</span>
-          <span className="btn-content">
-            <span className="btn-title">Decompress Files</span>
-            <span className="btn-desc">.zip → .txt</span>
-          </span>
-        </Link>
-      </div>
-
-      <div className="info-section">
-        <div className="info-card">
-          <h3>📋 How It Works</h3>
-          <ol>
-            <li>Upload your .txt file for compression or .zip file for decompression</li>
-            <li>The Huffman algorithm processes your file</li>
-            <li>Download the result instantly</li>
-          </ol>
+          <div className="feature-icon">
+            <IconLock />
+          </div>
+          <h3>100% Lossless</h3>
+          <p>Perfect restoration of original data without any quality degradation.</p>
         </div>
       </div>
     </div>

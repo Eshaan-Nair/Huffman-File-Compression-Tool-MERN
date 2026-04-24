@@ -2,6 +2,32 @@ import React, { useState, useRef } from 'react';
 import axios from '../api/axios';
 import './Compress.css';
 
+const IconUpload = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+    <polyline points="17 8 12 3 7 8"></polyline>
+    <line x1="12" y1="3" x2="12" y2="15"></line>
+  </svg>
+);
+
+const IconFile = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+    <polyline points="14 2 14 8 20 8"></polyline>
+    <line x1="16" y1="13" x2="8" y2="13"></line>
+    <line x1="16" y1="17" x2="8" y2="17"></line>
+    <polyline points="10 9 9 9 8 9"></polyline>
+  </svg>
+);
+
+const IconDownload = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+    <polyline points="7 10 12 15 17 10"></polyline>
+    <line x1="12" y1="15" x2="12" y2="3"></line>
+  </svg>
+);
+
 const Compress = () => {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -117,7 +143,6 @@ const Compress = () => {
         responseType: 'blob'
       });
       
-      // Use the display name from result if available
       const downloadName = result.displayName || filename;
       
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -148,15 +173,15 @@ const Compress = () => {
   };
 
   return (
-    <div className="compress-container">
-      <h1 className="page-title">
-        <span className="icon">🗜️</span>
-        Compress File
-      </h1>
+    <div className="app-page">
+      <div className="page-header">
+        <h1 className="page-title">Compress File</h1>
+        <p className="page-subtitle">Select a text file to compress into a ZIP archive.</p>
+      </div>
       
-      <div className="upload-section">
+      <div className="panel">
         <div 
-          className={`file-drop-zone ${isDragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
+          className={`drop-zone ${isDragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
           onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -168,124 +193,94 @@ const Compress = () => {
             ref={fileInputRef}
             onChange={handleFileChange}
             accept=".txt,.text"
-            className="file-input"
+            className="file-input-hidden"
           />
           
           {!file ? (
-            <div className="drop-zone-content">
-              <div className="upload-icon">📁</div>
-              <p className="drop-text">
-                {isDragging ? 'Drop your file here' : 'Drag & drop your .txt file here'}
-              </p>
-              <p className="drop-subtext">or click to browse</p>
-              <div className="file-requirements">
-                <span className="requirement-badge">📄 .txt files only</span>
-                <span className="requirement-badge">📊 Max 25MB</span>
+            <div className="drop-content">
+              <div className="icon-circle">
+                <IconUpload />
               </div>
+              <p className="drop-title">Click to upload or drag and drop</p>
+              <p className="drop-desc">TXT up to 25MB</p>
             </div>
           ) : (
-            <div className="file-preview">
-              <div className="file-icon">📄</div>
-              <div className="file-details">
-                <p className="file-name">{file.name}</p>
-                <p className="file-size">{formatBytes(file.size)}</p>
+            <div className="file-info">
+              <div className="file-info-left">
+                <IconFile />
+                <div className="file-meta">
+                  <span className="file-name">{file.name}</span>
+                  <span className="file-size">{formatBytes(file.size)}</span>
+                </div>
               </div>
               <button 
-                className="clear-btn"
+                className="btn-clear"
                 onClick={(e) => {
                   e.stopPropagation();
                   clearFile();
                 }}
               >
-                ✕
+                Clear
               </button>
             </div>
           )}
         </div>
 
+        {error && (
+          <div className="alert-error">
+            {error}
+          </div>
+        )}
+
         {file && !result && (
           <button
             onClick={handleCompress}
             disabled={loading}
-            className="compress-btn-action"
+            className="btn btn-primary btn-block"
           >
-            {loading ? (
-              <>
-                <span className="spinner"></span>
-                Compressing... {progress}%
-              </>
-            ) : (
-              <>
-                <span>🗜️</span>
-                Compress File
-              </>
-            )}
+            {loading ? `Compressing... ${progress}%` : 'Compress File'}
           </button>
         )}
 
         {loading && (
-          <div className="progress-bar-container">
-            <div className="progress-bar" style={{ width: `${progress}%` }}></div>
-          </div>
-        )}
-
-        {error && (
-          <div className="error-message">
-            <span className="error-icon">⚠️</span>
-            {error}
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: `${progress}%` }}></div>
           </div>
         )}
       </div>
 
       {result && (
-        <div className="result-section">
-          <div className="success-header">
-            <span className="success-icon">✓</span>
-            <h2>Compression Complete!</h2>
+        <div className="panel result-panel">
+          <div className="result-header">
+            <h3>Compression Complete</h3>
           </div>
           
-          <div className="stats">
-            <div className="stat-item">
-              <span className="stat-icon">📦</span>
-              <div className="stat-content">
-                <span className="stat-label">Original Size</span>
-                <span className="stat-value">{formatBytes(result.stats.originalSize)}</span>
-              </div>
+          <div className="data-grid">
+            <div className="data-item">
+              <span className="data-label">Original</span>
+              <span className="data-value">{formatBytes(result.stats.originalSize)}</span>
             </div>
-            <div className="stat-item">
-              <span className="stat-icon">🗜️</span>
-              <div className="stat-content">
-                <span className="stat-label">Compressed Size</span>
-                <span className="stat-value">{formatBytes(result.stats.compressedSize)}</span>
-              </div>
+            <div className="data-item">
+              <span className="data-label">Compressed</span>
+              <span className="data-value">{formatBytes(result.stats.compressedSize)}</span>
             </div>
-            <div className="stat-item">
-              <span className="stat-icon">📊</span>
-              <div className="stat-content">
-                <span className="stat-label">Compression Ratio</span>
-                <span className="stat-value">{result.stats.compressionRatio}</span>
-              </div>
+            <div className="data-item">
+              <span className="data-label">Ratio</span>
+              <span className="data-value">{result.stats.compressionRatio}</span>
             </div>
-            <div className="stat-item highlight">
-              <span className="stat-icon">💾</span>
-              <div className="stat-content">
-                <span className="stat-label">Space Saved</span>
-                <span className="stat-value success">{formatBytes(result.stats.spaceSaved)}</span>
-              </div>
+            <div className="data-item highlight">
+              <span className="data-label">Saved</span>
+              <span className="data-value success">{formatBytes(result.stats.spaceSaved)}</span>
             </div>
           </div>
 
           <button
             onClick={() => handleDownload(result.file)}
-            className="download-btn"
+            className="btn btn-primary btn-block"
           >
-            <span>📥</span>
-            Download ZIP File
+            <IconDownload />
+            Download Archive
           </button>
-
-          <p className="note">
-            💡 Save this ZIP file to decompress later!
-          </p>
         </div>
       )}
     </div>
